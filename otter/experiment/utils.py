@@ -77,8 +77,15 @@ def load_model_weights_from_experiment(
     path: Path | str,
     model: torch.nn.Module,
 ) -> torch.nn.Module:
-    state_dict = torch.load(path, weights_only=False, map_location="cpu")
-    model.load_state_dict(state_dict["model_state"], strict=True)
+    path = Path(path)
+    if path.suffix == ".safetensors":
+        from safetensors.torch import load_file
+
+        model_state = load_file(str(path), device="cpu")
+    else:
+        checkpoint = torch.load(path, weights_only=False, map_location="cpu")
+        model_state = checkpoint["model_state"]
+    model.load_state_dict(model_state, strict=True)
     return model
 
 

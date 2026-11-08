@@ -68,7 +68,8 @@ python -m otter.experiment.train --config_name dropout_crps --debug \
   constants.data.accumulate_batches=4
 ```
 
-The checkpoint override names a **file** whose `model_state` loads strictly into
+The checkpoint override accepts `.pt` files containing `model_state` or
+`.safetensors` files. Model weights load strictly into
 the unchanged Delta head and backbone, starting a new experiment with a fresh
 optimizer. Match the source architecture, variables, context, grid and
 normalization settings if it differs from `base`. `--debug` permits uncommitted
@@ -124,11 +125,24 @@ The helper temporarily enables the dropout layers and restores their previous
 modes afterward. Reset the seed before the whole call to reproduce an ensemble
 draw in a supported test environment.
 
-Verification in this change is limited to static review: no training or tests
-were run on this laptop, and no real pretrained checkpoint was available.
-The new tests define fixture-based conversion, dropout, fair-CRPS and resume
-checks. On a suitable training machine, run them and the conversion command above
-with a real matching checkpoint to verify acceptance:
+Verification completed on CSD3 on 2026-11-08, job 40307396.
+Five trainer fixture tests passed, including deterministic regression and
+save/resume. Exact CRPS, weighting, dropout and seed checks use small fixtures.
+
+The real-checkpoint pilot used `jonasscholz/otter` revision
+`ba9bc7600fa21c3b4893211a7815b8e5035cd4fb`, an already deterministic
+rollout-fine-tuned model. Its architecture and inputs were preserved; new
+training used one six-hour target, two members, dropout 0.1 and zero drop-path.
+Two updates completed, then resume restored step 2 and completed step 3.
+Losses and gradients were finite, and validation ensemble spread was positive.
+
+The pilot used BF16 eager execution, four training cases and one validation
+case. Best validation weighted fair CRPS was 0.503095. PyTorch peak allocated
+GPU memory was 24.98 GiB and peak reserved memory was 26.33 GiB on an 80 GB A100.
+Both best and latest checkpoints were saved. These are technical smoke-test
+results; forecast quality needs broader evaluation.
+
+To repeat the fixture checks on a suitable compute allocation:
 
 ```bash
 TORCH_COMPILE_DISABLE=1 python -m pytest \

@@ -117,6 +117,11 @@ def tiny_config(name="dropout_crps", dropout=0.35):
     )
 
 
+def make_validation_losses(config):
+    resolved = OmegaConf.to_container(config.val_loss_fns, resolve=True)
+    return instantiate(resolved)
+
+
 def make_model(config):
     return instantiate(config.model, device="cpu")
 
@@ -128,9 +133,7 @@ def make_batch(model):
         torch.randn(shape, generator=generator) * model.ctx_std
         + model.ctx_mean
     )
-    target = (
-        context[..., :1, model.idx_residual].clone() + 0.1 * model.trg_std
-    )
+    target = context[..., :1, model.idx_residual].clone() + 0.1 * model.trg_std
     return ForecastingSample(
         ctx=context,
         trg=target,
@@ -240,7 +243,7 @@ def test_validation_is_stochastic_read_only_and_restores_modes():
             model=model,
             device="cpu",
             dataloader=[make_batch(model)],
-            loss_fns=instantiate(config.val_loss_fns),
+            loss_fns=make_validation_losses(config),
             mixed_precision_dtype=torch.bfloat16,
             ensemble_members=3,
         )
@@ -282,7 +285,7 @@ def test_deterministic_training_and_validation_contract():
         model,
         "cpu",
         [make_batch(model)],
-        instantiate(config.val_loss_fns),
+        make_validation_losses(config),
         torch.bfloat16,
     )
     assert set(losses) == {"train_loss", "raw_rmse", "raw_lwrmse"}
@@ -291,7 +294,8 @@ def test_deterministic_training_and_validation_contract():
 
 def test_checkpoint_selection_uses_forecast_crps(monkeypatch):
     monkeypatch.setattr(
-        train, "run_validation_epoch",
+        train,
+        "run_validation_epoch",
         lambda **kwargs: (
             {"train_loss": [104.0], "fair_crps": [4.0]},
             {
@@ -310,7 +314,7 @@ def test_checkpoint_selection_uses_forecast_crps(monkeypatch):
 def make_experiment(config, path, source, *, resume, max_steps):
     model = make_model(config)
     objective = EnsembleObjective(instantiate(config.loss_fn))
-    validation = dict(instantiate(config.val_loss_fns))
+    validation = dict(make_validation_losses(config))
     validation["train_loss"] = objective
     return OmegaConf.create(
         {

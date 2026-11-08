@@ -79,6 +79,10 @@ def mc_dropout_ensemble_size(config: DictConfig) -> int | None:
     Runs fine-tuned with a CRPS loss on MC dropout ensembles only forecast
     well with dropout on: with it off, they drift.
     """
+    ensemble = config.constants.get("ensemble", {})
+    if ensemble.get("enabled", False):
+        return int(ensemble["validation_members"])
+
     validation = config.constants.get("validation", {})
     if not validation.get("mc_dropout", False):
         return None

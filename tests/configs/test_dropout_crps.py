@@ -66,7 +66,9 @@ def test_dropout_config_instantiates_only_ensemble_objectives() -> None:
         assert callable(instantiate(metric))
 
 
-def test_documented_conversion_command_and_independent_batch_controls() -> None:
+def test_documented_conversion_command_and_independent_batch_controls() -> (
+    None
+):
     args, overrides = _parse_args(
         [
             "--config_name",
@@ -115,3 +117,24 @@ def test_documented_resume_command() -> None:
     assert args.resume_experiment == "dropout-finetuning-experiment"
     assert args.debug
     assert overrides == []
+
+
+def test_forecast_recognizes_ensemble_configuration():
+    from otter.evaluate.save_forecasts import mc_dropout_ensemble_size
+
+    assert mc_dropout_ensemble_size(_config()) == 8
+    changed = _config(["constants.ensemble.validation_members=3"])
+    assert mc_dropout_ensemble_size(changed) == 3
+    deterministic = _get_config("otter.experiment.config", "base", [])
+    assert mc_dropout_ensemble_size(deterministic) is None
+    legacy = OmegaConf.create(
+        {
+            "constants": {
+                "validation": {
+                    "mc_dropout": True,
+                    "num_ensemble_members": 5,
+                }
+            },
+        }
+    )
+    assert mc_dropout_ensemble_size(legacy) == 5
